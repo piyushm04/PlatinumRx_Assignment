@@ -1,0 +1,59 @@
+-- Q1: Revenue by channel
+SELECT sales_channel, SUM(amount) AS revenue
+FROM clinic_sales
+GROUP BY sales_channel;
+
+-- Q2: Top 10 customers
+SELECT uid, SUM(amount) AS total_spent
+FROM clinic_sales
+GROUP BY uid
+ORDER BY total_spent DESC
+LIMIT 10;
+
+-- Q3: Profit/Loss
+WITH rev AS (
+    SELECT MONTH(datetime) m, SUM(amount) r
+    FROM clinic_sales GROUP BY MONTH(datetime)
+),
+exp AS (
+    SELECT MONTH(datetime) m, SUM(amount) e
+    FROM expenses GROUP BY MONTH(datetime)
+)
+SELECT r.m,
+       r.r,
+       e.e,
+       (r.r - e.e) AS profit,
+       CASE WHEN (r.r - e.e)>0 THEN 'Profitable'
+            ELSE 'Loss'
+       END status
+FROM rev r JOIN exp e ON r.m=e.m;
+
+-- Q4: Most profitable clinic per city
+WITH data AS (
+    SELECT c.city, c.cid,
+           SUM(cs.amount)-COALESCE(SUM(e.amount),0) profit
+    FROM clinics c
+    JOIN clinic_sales cs ON c.cid=cs.cid
+    LEFT JOIN expenses e ON c.cid=e.cid
+    GROUP BY c.city,c.cid
+),
+ranked AS (
+    SELECT *, RANK() OVER(PARTITION BY city ORDER BY profit DESC) rnk
+    FROM data
+)
+SELECT * FROM ranked WHERE rnk=1;
+
+-- Q5: 2nd least profitable clinic per state
+WITH data AS (
+    SELECT c.state, c.cid,
+           SUM(cs.amount)-COALESCE(SUM(e.amount),0) profit
+    FROM clinics c
+    JOIN clinic_sales cs ON c.cid=cs.cid
+    LEFT JOIN expenses e ON c.cid=e.cid
+    GROUP BY c.state,c.cid
+),
+ranked AS (
+    SELECT *, RANK() OVER(PARTITION BY state ORDER BY profit ASC) rnk
+    FROM data
+)
+SELECT * FROM ranked WHERE rnk=2;
